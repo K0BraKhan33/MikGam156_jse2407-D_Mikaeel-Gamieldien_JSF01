@@ -1,4 +1,4 @@
-'use client'; // Add this line if you use client-side hooks or state
+'use client';
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -6,38 +6,153 @@ import Link from 'next/link';
 
 export default function ProductsPage({ searchParams }) {
   const [products, setProducts] = useState([]);
+  const [allSearchResults, setAllSearchResults] = useState([]); // Store all search results for pagination
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.category || ''); // Default to empty if no category
+  const [searchInput, setSearchInput] = useState(searchParams.search || ''); // Input field for search
+  const [searchTerm, setSearchTerm] = useState(searchParams.search || ''); // Actual search term
+  const [sortOrder, setSortOrder] = useState(searchParams.sortBy || ''); // Default to no sorting
+  const [sortDirection, setSortDirection] = useState(searchParams.order || ''); // Default to no sorting
   const [page, setPage] = useState(searchParams.page ? parseInt(searchParams.page, 10) : 1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const limit = 20;
-  const skip = (page - 1) * limit;
   const router = useRouter();
 
+  // Fetch categories from the API
   useEffect(() => {
-    async function fetchProducts() {
-      setLoading(true);
-      setError(null);
+    async function fetchCategories() {
       try {
-        const res = await fetch(`https://book-connect-api.vercel.app/books?limit=${limit}&skip=${skip}`);
+        const res = await fetch('https://next-ecommerce-api.vercel.app/categories');
         if (!res.ok) {
-          throw new Error('Failed to fetch products');
+          throw new Error('Failed to fetch categories');
         }
         const data = await res.json();
-        setProducts(data);
+        const uniqueCategories = [...new Set(data)];
+        setCategories(uniqueCategories);
       } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+        console.error('Error fetching categories:', err);
       }
     }
-    
-    fetchProducts();
-  }, [page]);
 
+    fetchCategories();
+  }, []);
+
+  // Fetch products based on category, search term, sort order, and page
+  const fetchProducts = async (category = selectedCategory, search = searchTerm, sortBy = sortOrder, order = sortDirection, pageNum = page) => {
+    setLoading(true);
+    setError(null);
+    try {
+      let apiUrl = 'https://next-ecommerce-api.vercel.app/products?';
+      const params = new URLSearchParams();
+
+      if (search) {
+        params.append('search', search);
+        // When searching, fetch all results to handle sorting and pagination client-side
+        params.append('limit', '3000');
+      } else {
+        params.append('limit', limit);
+        params.append('skip', (pageNum - 1) * limit); // Pagination
+      }
+      if (category) {
+        params.append('category', category);
+      }
+      if (sortBy) {
+        params.append('sortBy', sortBy);
+      }
+      if (order) {
+        params.append('order', order);
+      }
+
+      apiUrl += params.toString();
+
+      const res = await fetch(apiUrl);
+      if (!res.ok) {
+        throw new Error('Failed to fetch products');
+      }
+      const data = await res.json();
+
+      if (search) {
+        // Handle sorting and pagination client-side for search results
+        const sortedData = data.sort((a, b) => {
+          if (sortBy === 'price') {
+            return sortDirection === 'asc' ? a.price - b.price : b.price - a.price;
+          }
+          if (sortBy === 'rating') {
+            return sortDirection === 'asc' ? a.rating - b.rating : b.rating - a.rating;
+          }
+          return 0; // Default case if no sorting criteria matches
+        });
+
+        const start = (pageNum - 1) * limit;
+        const end = start + limit;
+        setProducts(sortedData.slice(start, end));
+        setAllSearchResults(sortedData); // Store all search results
+      } else {
+        setProducts(data);
+        setAllSearchResults([]);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle search when the Search button is clicked or Enter is pressed
+  const handleSearch = () => {
+    setSearchTerm(searchInput); // Set the search term to the current input
+    router.push(`/product/productsPage?category=${selectedCategory}&search=${searchInput}&sortBy=${sortOrder}&order=${sortDirection}&page=1`);
+    fetchProducts(selectedCategory, searchInput, sortOrder, sortDirection, 1);
+    setPage(1);
+  };
+
+  // Handle category change
+  const handleCategoryChange = (category) => {
+    setSelectedCategory(category);
+    router.push(`/product/productsPage?category=${category}&search=${searchTerm}&sortBy=${sortOrder}&order=${sortDirection}&page=1`);
+    fetchProducts(category, searchTerm, sortOrder, sortDirection, 1);
+    setPage(1);
+  };
+
+  // Handle sorting order change
+  const handleSortChange = (e) => {
+    const [sortBy, order] = e.target.value.split(':');
+    setSortOrder(sortBy);
+    setSortDirection(order === 'asc' ? 'asc' : 'desc'); // Ensure order is 'asc' or 'desc'
+    router.push(`/product/productsPage?category=${selectedCategory}&search=${searchTerm}&sortBy=${sortBy}&order=${order}&page=1`);
+    fetchProducts(selectedCategory, searchTerm, sortBy, order, 1);
+    setPage(1);
+  };
+
+  // Handle page change
   const handlePageChange = (newPage) => {
     setPage(newPage);
-    router.push(`/product/productsPage?page=${newPage}`);
+    router.push(`/product/productsPage?category=${selectedCategory}&search=${searchTerm}&sortBy=${sortOrder}&order=${sortDirection}&page=${newPage}`);
+    fetchProducts(selectedCategory, searchTerm, sortOrder, sortDirection, newPage);
   };
+
+  // Trigger search on Enter key press
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  // Fetch products whenever category, search term, or page changes
+  useEffect(() => {
+    fetchProducts(selectedCategory, searchTerm, sortOrder, sortDirection, page);
+  }, [selectedCategory, searchTerm, sortOrder, sortDirection, page]);
+
+  useEffect(() => {
+    // Initialize the filters and sorting options based on URL parameters on initial load
+    setSelectedCategory(searchParams.category || '');
+    setSearchInput(searchParams.search || '');
+    setSearchTerm(searchParams.search || '');
+    setSortOrder(searchParams.sortBy || '');
+    setSortDirection(searchParams.order || '');
+    setPage(searchParams.page ? parseInt(searchParams.page, 10) : 1);
+  }, [searchParams]);
 
   if (loading) {
     return <div className="text-center">Loading...</div>;
@@ -50,31 +165,108 @@ export default function ProductsPage({ searchParams }) {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Products</h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {products.map((product) => (
-          <div key={product.id} className="border p-4 rounded shadow">
-            <Link href={`/product/productsPage/${product.id}?page=${page}`}>
-              <img src={product.image} alt={product.title} className="h-48 w-full object-cover rounded mb-2" />
-            </Link>
-            <h3 className="text-xl font-semibold">{product.title}</h3>
-            <p className="text-lg text-gray-700">{product.price}</p>
-            <p className="flex overflow-x-auto text-sm text-gray-500">Product Topic</p>
-            
-            <div className="flex flex-wrap mt-2">
-              {product.genreNames.map((genre) => (
-                <p key={genre} className="mr-2 mb-1 bg-gray-200 px-2 py-1 rounded text-sm text-gray-600">{genre}</p>
-              ))}
-            </div>
+
+      {/* Filters and Search */}
+      <div className="flex flex-col md:flex-row gap-4 mb-4">
+        {/* Category dropdown */}
+        <div className="w-full md:w-1/3">
+          <select
+            value={selectedCategory}
+            onChange={(e) => handleCategoryChange(e.target.value)}
+            className="w-full p-2 border rounded text-black"
+          >
+            <option value="">All Categories</option>
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Sort by dropdown */}
+        <div className="w-full md:w-1/3">
+          <select
+            value={`${sortOrder}:${sortDirection}`}
+            onChange={handleSortChange}
+            className="w-full p-2 border rounded text-black"
+          >
+            <option value="">Sort By</option>
+            <option value="price:asc">Price: Low to High</option>
+            <option value="price:desc">Price: High to Low</option>
+            <option value="rating:asc">Rating: Low to High</option>
+            <option value="rating:desc">Rating: High to Low</option>
+          </select>
+        </div>
+
+        {/* Search bar */}
+        <div className="w-full md:w-1/3">
+          <div className="flex">
+            <input
+              type="text"
+              value={searchInput} // Use searchInput for the input field
+              onChange={(e) => setSearchInput(e.target.value)} // Update searchInput on change
+              onKeyDown={handleKeyDown} // Trigger search on Enter key press
+              placeholder="Search by product title..."
+              className="w-full p-2 border rounded text-black"
+            />
+            <button
+              onClick={handleSearch} // Trigger search on button click
+              className="ml-2 bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              Search
+            </button>
           </div>
-        ))}
+        </div>
       </div>
 
-      <div className="flex justify-center items-center mt-6 space-x-4">
-        {page > 1 && (
-          <button onClick={() => handlePageChange(page - 1)} className="bg-blue-500 text-white px-4 py-2 rounded">Previous</button>
-        )}
-        <span className="text-lg">Page {page}</span>
-        <button onClick={() => handlePageChange(page + 1)} className="bg-blue-500 text-white px-4 py-2 rounded">Next</button>
+      {/* Product list or No items found message */}
+      {products.length === 0 ? (
+        <div className="text-center text-xl text-gray-500">
+          No items found for: {searchTerm}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {products.map((product) => (
+            <div key={product.id} className="border p-4 rounded shadow-sm">
+              <Link href={`/product/productsPage/${product.id}`}>
+                <img
+                  src={product.thumbnail}
+                  alt={product.title}
+                  className="w-full h-48 object-cover rounded"
+                />
+                <h2 className="text-lg font-semibold mt-2">{product.title}</h2>
+              </Link>
+              <p className="text-sm text-gray-500">Category: {product.category}</p>
+              <div className="flex flex-wrap mt-2">
+                {product.tags.map((tag) => (
+                  <p key={tag} className="mr-2 mb-1 bg-gray-200 px-2 py-1 rounded text-sm text-gray-600">{tag}</p>
+                ))}
+              </div>
+              <p className="mt-2 font-bold">${product.price.toFixed(2)}</p>
+              <p className="mt-1 text-gray-500">Rating: {product.rating}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination controls */}
+      <div className="flex justify-between mt-4">
+        <button
+          onClick={() => handlePageChange(page - 1)}
+          disabled={page === 1}
+          className="px-4 py-2 bg-gray-200 text-gray-600 rounded"
+        >
+          Previous
+        </button>
+        <span className="self-center">Page {page}</span>
+        <button
+          onClick={() => handlePageChange(page + 1)}
+          disabled={products.length < limit}
+          className="px-4 py-2 bg-gray-200 text-gray-600 rounded"
+        >
+          Next
+        </button>
       </div>
     </div>
   );

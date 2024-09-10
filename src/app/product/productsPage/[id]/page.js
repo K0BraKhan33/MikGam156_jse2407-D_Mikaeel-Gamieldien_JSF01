@@ -1,6 +1,6 @@
-'use client'; // Add this line if you use client-side hooks or state
+'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function ProductDetailsPage({ params }) {
@@ -8,21 +8,64 @@ export default function ProductDetailsPage({ params }) {
   const searchParams = useSearchParams();
   const prePage = searchParams.get('page'); // Get 'page' from query parameters
   const [product, setProduct] = useState(null);
+  const [imagesLoaded, setImagesLoaded] = useState(false); // Track image loading state
+  const [userInteracted, setUserInteracted] = useState(false); // Track user interaction
+  const [currentImageIndex, setCurrentImageIndex] = useState(0); // Track current image index
   const router = useRouter();
+  const imageContainerRef = useRef(null);
+  const autoScrollTimeout = useRef(null);
 
   useEffect(() => {
     async function fetchProduct() {
-      const res = await fetch(`https://book-connect-api.vercel.app/books/${id}`);
+      const res = await fetch(`https://next-ecommerce-api.vercel.app/products/${id}`);
       if (!res.ok) {
-        // Handle the error here
         return;
       }
       const data = await res.json();
       setProduct(data);
     }
-    
     fetchProduct();
   }, [id]);
+
+  const handleImageLoad = () => {
+    setImagesLoaded(true);
+  };
+
+  const handleBackClick = () => {
+    router.push(`/product/productsPage?page=${prePage || 1}`); // Navigate back with page number
+  };
+
+  const resetAutoScroll = () => {
+    setUserInteracted(true);
+    if (autoScrollTimeout.current) clearTimeout(autoScrollTimeout.current);
+    autoScrollTimeout.current = setTimeout(() => {
+      setUserInteracted(false); // Reset user interaction after 3 seconds of inactivity
+    }, 3000);
+  };
+
+  useEffect(() => {
+    if (!userInteracted && product?.images?.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentImageIndex((prevIndex) =>
+          prevIndex + 1 >= product.images.length ? 0 : prevIndex + 1
+        );
+      }, 3000);
+
+      return () => clearInterval(interval);
+    }
+  }, [userInteracted, product]);
+
+  useEffect(() => {
+    if (product?.images?.length > 1 && imageContainerRef.current) {
+      imageContainerRef.current.scrollLeft =
+        currentImageIndex * imageContainerRef.current.offsetWidth;
+    }
+  }, [currentImageIndex, product]);
+
+  const handleThumbnailClick = (index) => {
+    setCurrentImageIndex(index);
+    resetAutoScroll();
+  };
 
   if (!product) {
     return <div className="text-center text-red-500">Failed to load product details. Please try again later.</div>;
@@ -30,18 +73,15 @@ export default function ProductDetailsPage({ params }) {
 
   const {
     title,
-    published,
-    pages,
-    popularity,
     description,
-    authorName,
-    image,
-    genreNames
+    price,
+    rating,
+    stock,
+    category,
+    tags,
+    brand,
+    images
   } = product;
-
-  const handleBackClick = () => {
-    router.push(`/product/productsPage?page=${prePage || 1}`); // Navigate back with page number
-  };
 
   return (
     <div className="container mx-auto p-4">
@@ -49,17 +89,63 @@ export default function ProductDetailsPage({ params }) {
         Back to Products
       </button>
       <h1 className="text-2xl font-bold mb-4">{title}</h1>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="gallery space-y-4">
-          <img src={image} alt={title} className="w-auto h-[45vw] object-cover rounded" />
+        <div className="gallery relative flex flex-col">
+          {!imagesLoaded && (
+            <div className="text-center text-blue-500">ProductID {id} found, please wait...</div>
+          )}
+          <div
+            className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4"
+            ref={imageContainerRef}
+            onScroll={resetAutoScroll}
+            onTouchStart={resetAutoScroll}
+            onMouseDown={resetAutoScroll}
+            style={{ width: '100%', height: '80vh' }} // Adjust gallery container height
+          >
+            {images?.map((img, idx) => (
+              <div
+                key={idx}
+                className="flex-shrink-0 w-full h-[full] relative snap-center"
+              >
+                <img
+                  src={img}
+                  alt={title}
+                  className="w-full h-full object-cover rounded"
+                  onLoad={handleImageLoad}
+                  style={{
+                    display: imagesLoaded ? 'block' : 'none',
+                    maxHeight: '100%', // Ensure image height is smaller than the gallery height
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Thumbnails */}
+          <div className="thumbnails flex space-x-2 mt-4 justify-center">
+            {images?.map((img, idx) => (
+              <img
+                key={idx}
+                src={img}
+                alt={`${title} thumbnail ${idx + 1}`}
+                className={`w-16 h-16 object-cover cursor-pointer rounded border-2 ${
+                  currentImageIndex === idx ? 'border-blue-500' : 'border-transparent'
+                }`}
+                onClick={() => handleThumbnailClick(idx)}
+              />
+            ))}
+          </div>
         </div>
-        <div>
-          <p className="text-lg font-semibold">Author: {authorName}</p>
-          <p className="text-lg font-semibold">Published: {new Date(published).toLocaleDateString()}</p>
-          <p className="text-lg font-semibold">Pages: {pages}</p>
-          <p className="text-lg font-semibold">Popularity: {popularity}</p>
+
+        <div className="md:col-span-1 mt-4 md:mt-0">
+          <p className="text-lg font-semibold">Brand: {brand}</p>
+          <p className="text-lg font-semibold">Category: {category}</p>
+          <p className="text-lg font-semibold">Price: ${price}</p>
+          <p className="text-lg font-semibold">Rating: {rating} / 5</p>
+          <p className="text-lg font-semibold">Stock: {stock} units available</p>
           <p className="text-lg mt-4">{description}</p>
-          <p className="text-lg font-semibold mt-4">Genres: {genreNames.join(', ')}</p>
+          <p className="text-lg font-semibold mt-4">Tags: {tags?.join(', ')}</p>
         </div>
       </div>
     </div>

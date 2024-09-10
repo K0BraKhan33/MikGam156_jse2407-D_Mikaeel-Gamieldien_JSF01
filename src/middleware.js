@@ -8,7 +8,7 @@ export function middleware(request) {
   // Check if the path is the root URL
   if (url.pathname === '/') {
     // Redirect to /products
-    url.pathname = '/products';
+    url.pathname = '/product/productsPage';
     return NextResponse.redirect(url);
   }
 
