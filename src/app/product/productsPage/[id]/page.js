@@ -6,12 +6,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 export default function ProductDetailsPage({ params }) {
   const { id } = params;
   const searchParams = useSearchParams();
-  const prePage = searchParams.get('page'); // Get 'page' from query parameters
-  const [product, setProduct] = useState(null);
-  const [imagesLoaded, setImagesLoaded] = useState(false); // Track image loading state
-  const [userInteracted, setUserInteracted] = useState(false); // Track user interaction
-  const [currentImageIndex, setCurrentImageIndex] = useState(0); // Track current image index
   const router = useRouter();
+  const prePage = searchParams.get('page') || '1'; // Get 'page' from query parameters, default to '1'
+  const [product, setProduct] = useState(null);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+  const [userInteracted, setUserInteracted] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const imageContainerRef = useRef(null);
   const autoScrollTimeout = useRef(null);
 
@@ -32,14 +32,22 @@ export default function ProductDetailsPage({ params }) {
   };
 
   const handleBackClick = () => {
-    router.push(`/product/productsPage?page=${prePage || 1}`); // Navigate back with page number
+    const queryParams = {
+      category: searchParams.get('category') || '',
+      search: searchParams.get('search') || '',
+      sortBy: searchParams.get('sortBy') || '',
+      order: searchParams.get('order') || '',
+      page: prePage
+    };
+    const queryString = new URLSearchParams(queryParams).toString();
+    router.push(`/product/productsPage?${queryString}`);
   };
 
   const resetAutoScroll = () => {
     setUserInteracted(true);
     if (autoScrollTimeout.current) clearTimeout(autoScrollTimeout.current);
     autoScrollTimeout.current = setTimeout(() => {
-      setUserInteracted(false); // Reset user interaction after 3 seconds of inactivity
+      setUserInteracted(false);
     }, 3000);
   };
 
@@ -101,7 +109,7 @@ export default function ProductDetailsPage({ params }) {
             onScroll={resetAutoScroll}
             onTouchStart={resetAutoScroll}
             onMouseDown={resetAutoScroll}
-            style={{ width: '100%', height: '80vh' }} // Adjust gallery container height
+            style={{ width: '100%', height: '80vh' }}
           >
             {images?.map((img, idx) => (
               <div
@@ -115,14 +123,13 @@ export default function ProductDetailsPage({ params }) {
                   onLoad={handleImageLoad}
                   style={{
                     display: imagesLoaded ? 'block' : 'none',
-                    maxHeight: '100%', // Ensure image height is smaller than the gallery height
+                    maxHeight: '100%',
                   }}
                 />
               </div>
             ))}
           </div>
 
-          {/* Thumbnails */}
           <div className="thumbnails flex space-x-2 mt-4 justify-center">
             {images?.map((img, idx) => (
               <img

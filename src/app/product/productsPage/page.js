@@ -1,5 +1,4 @@
 'use client';
-
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -59,9 +58,9 @@ export default function ProductsPage({ searchParams }) {
       }
       if (sortBy) {
         params.append('sortBy', sortBy);
-      }
-      if (order) {
-        params.append('order', order);
+        if (order) { // Only add order if sortBy is present
+          params.append('order', order);
+        }
       }
 
       apiUrl += params.toString();
@@ -99,10 +98,28 @@ export default function ProductsPage({ searchParams }) {
     }
   };
 
+  // Helper function to build URL query string
+  const buildQueryString = (params) => {
+    const query = new URLSearchParams();
+    if (params.category) query.append('category', params.category);
+    if (params.search) query.append('search', params.search);
+    if (params.sortBy) query.append('sortBy', params.sortBy);
+    if (params.order) query.append('order', params.order);
+    query.append('page', params.page);
+    return query.toString();
+  };
+
   // Handle search when the Search button is clicked or Enter is pressed
   const handleSearch = () => {
     setSearchTerm(searchInput); // Set the search term to the current input
-    router.push(`/product/productsPage?category=${selectedCategory}&search=${searchInput}&sortBy=${sortOrder}&order=${sortDirection}&page=1`);
+    const queryString = buildQueryString({
+      category: selectedCategory,
+      search: searchInput,
+      sortBy: sortOrder,
+      order: sortDirection,
+      page: 1
+    });
+    router.push(`/product/productsPage?${queryString}`);
     fetchProducts(selectedCategory, searchInput, sortOrder, sortDirection, 1);
     setPage(1);
   };
@@ -110,7 +127,14 @@ export default function ProductsPage({ searchParams }) {
   // Handle category change
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
-    router.push(`/product/productsPage?category=${category}&search=${searchTerm}&sortBy=${sortOrder}&order=${sortDirection}&page=1`);
+    const queryString = buildQueryString({
+      category,
+      search: searchTerm,
+      sortBy: sortOrder,
+      order: sortDirection,
+      page: 1
+    });
+    router.push(`/product/productsPage?${queryString}`);
     fetchProducts(category, searchTerm, sortOrder, sortDirection, 1);
     setPage(1);
   };
@@ -120,7 +144,14 @@ export default function ProductsPage({ searchParams }) {
     const [sortBy, order] = e.target.value.split(':');
     setSortOrder(sortBy);
     setSortDirection(order === 'asc' ? 'asc' : 'desc'); // Ensure order is 'asc' or 'desc'
-    router.push(`/product/productsPage?category=${selectedCategory}&search=${searchTerm}&sortBy=${sortBy}&order=${order}&page=1`);
+    const queryString = buildQueryString({
+      category: selectedCategory,
+      search: searchTerm,
+      sortBy,
+      order,
+      page: 1
+    });
+    router.push(`/product/productsPage?${queryString}`);
     fetchProducts(selectedCategory, searchTerm, sortBy, order, 1);
     setPage(1);
   };
@@ -128,7 +159,14 @@ export default function ProductsPage({ searchParams }) {
   // Handle page change
   const handlePageChange = (newPage) => {
     setPage(newPage);
-    router.push(`/product/productsPage?category=${selectedCategory}&search=${searchTerm}&sortBy=${sortOrder}&order=${sortDirection}&page=${newPage}`);
+    const queryString = buildQueryString({
+      category: selectedCategory,
+      search: searchTerm,
+      sortBy: sortOrder,
+      order: sortDirection,
+      page: newPage
+    });
+    router.push(`/product/productsPage?${queryString}`);
     fetchProducts(selectedCategory, searchTerm, sortOrder, sortDirection, newPage);
   };
 
@@ -229,7 +267,15 @@ export default function ProductsPage({ searchParams }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {products.map((product) => (
             <div key={product.id} className="border p-4 rounded shadow-sm">
-              <Link href={`/product/productsPage/${product.id}`}>
+              <Link 
+                href={`/product/productsPage/${product.id}?${buildQueryString({
+                  category: selectedCategory,
+                  search: searchTerm,
+                  sortBy: sortOrder,
+                  order: sortDirection,
+                  page
+                })}`}
+              >
                 <img
                   src={product.thumbnail}
                   alt={product.title}
