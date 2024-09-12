@@ -15,6 +15,7 @@ export default function ProductsPage({ searchParams }) {
   const [page, setPage] = useState(searchParams.page ? parseInt(searchParams.page, 10) : 1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [imageIndex, setImageIndex] = useState({}); // Store the current image index for each product
   const limit = 20;
   const router = useRouter();
 
@@ -192,13 +193,38 @@ export default function ProductsPage({ searchParams }) {
     setPage(searchParams.page ? parseInt(searchParams.page, 10) : 1);
   }, [searchParams]);
 
-  if (loading) {
-    return <div className="text-center">Loading...</div>;
-  }
+  const handleImageChange = (productId, direction) => {
+    setImageIndex((prevIndex) => {
+      const currentIndex = prevIndex[productId] || 0;
+      const imagesCount = products.find((product) => product.id === productId)?.images.length || 0;
+      const newIndex = direction === 'prev' 
+        ? (currentIndex - 1 + imagesCount) % imagesCount 
+        : (currentIndex + 1) % imagesCount;
+      return { ...prevIndex, [productId]: newIndex };
+    });
+  };
 
-  if (error) {
-    return <div className="text-center text-red-500">{error}</div>;
-  }
+  const handleGoBack = () => {
+    router.back();
+   };
+ 
+ 
+ 
+   if (loading) {
+     return <div className="text-center">Loading...</div>;
+   }
+ 
+   if (error) {
+     return (
+       <div className="text-center text-red-500">
+         {error}
+         <div className="mt-4">
+ 
+           <button onClick={handleGoBack} className="ml-2 px-4 py-2 bg-gray-500 text-white rounded">Go Back</button>
+ 
+         </div>
+       </div>
+     )}
 
   return (
     <div className="container mx-auto p-4">
@@ -267,22 +293,42 @@ export default function ProductsPage({ searchParams }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {products.map((product) => (
             <div key={product.id} className="border p-4 rounded shadow-sm">
-              <Link 
+              
+              
+                <div className="relative">
+                  {product.images.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => handleImageChange(product.id, 'prev')}
+                        className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-gray-700 text-white px-2 py-1 rounded"
+                      >
+                        &lt;
+                      </button>
+                      <button
+                        onClick={() => handleImageChange(product.id, 'next')}
+                        className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-gray-700 text-white px-2 py-1 rounded"
+                      >
+                        &gt;
+                      </button>
+                    </>
+                  )}
+                  <Link
                 href={`/product/productsPage/${product.id}?${buildQueryString({
                   category: selectedCategory,
                   search: searchTerm,
                   sortBy: sortOrder,
                   order: sortDirection,
                   page
-                })}`}
-              >
-                <img
-                  src={product.thumbnail}
-                  alt={product.title}
-                  className="w-full h-48 object-cover rounded"
-                />
+                })}`}>
+                  <img
+                    src={product.images[imageIndex[product.id] || 0]}
+                    alt={product.title}
+                    className="w-full h-48 object-cover rounded"
+                  />
+                     </Link>
+                </div>
                 <h2 className="text-lg font-semibold mt-2">{product.title}</h2>
-              </Link>
+           
               <p className="text-sm text-gray-500">Category: {product.category}</p>
               <div className="flex flex-wrap mt-2">
                 {product.tags.map((tag) => (
