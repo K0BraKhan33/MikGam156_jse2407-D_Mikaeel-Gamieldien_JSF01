@@ -2,8 +2,8 @@
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-
 export default function ProductsPage({ searchParams }) {
+  // State variables to manage product data, categories, pagination, etc.
   const [products, setProducts] = useState([]);
   const [allSearchResults, setAllSearchResults] = useState([]); // Store all search results for pagination
   const [categories, setCategories] = useState([]);
@@ -12,11 +12,11 @@ export default function ProductsPage({ searchParams }) {
   const [searchTerm, setSearchTerm] = useState(searchParams.search || ''); // Actual search term
   const [sortOrder, setSortOrder] = useState(searchParams.sortBy || ''); // Default to no sorting
   const [sortDirection, setSortDirection] = useState(searchParams.order || ''); // Default to no sorting
-  const [page, setPage] = useState(searchParams.page ? parseInt(searchParams.page, 10) : 1);
+  const [page, setPage] = useState(searchParams.page ? parseInt(searchParams.page, 10) : 1); // Default to page 1
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [imageIndex, setImageIndex] = useState({}); // Store the current image index for each product
-  const limit = 20;
+  const limit = 20; // Limit products per page to 20
   const router = useRouter();
 
   // Fetch categories from the API
@@ -203,13 +203,13 @@ export default function ProductsPage({ searchParams }) {
       return { ...prevIndex, [productId]: newIndex };
     });
   };
-
+//go back if items arent found
   const handleGoBack = () => {
     router.back();
    };
  
  
- 
+ //error if hadaling
    if (loading) {
      return <div className="text-center">Loading...</div>;
    }
