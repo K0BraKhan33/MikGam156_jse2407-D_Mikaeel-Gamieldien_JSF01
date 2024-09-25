@@ -1,4 +1,5 @@
-export default function Loading() {
-    return <div className="text-center text-gray-500">Loading products...</div>;
-  }
-  
+const Loading = () => {
+  return <div className="text-center">Loading...</div>;
+};
+
+export default Loading;
